@@ -190,13 +190,13 @@ def _produce_generator_image_batch(step, sess):
 	    tiles.append(np.reshape(simgs[i*8:(i+1)*8,:], [28*8,28]))
 	plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=mpl.cm.gray)
 	plt.colorbar()
-	plt.savefig('generator_imgs/img_step_{}.png'.format(step))
+	plt.savefig('generator_imgs/img_{}.png'.format(step))
 
 sess = tf.Session()
 sess.run(tf.initialize_all_variables())
 summary_writer = tf.train.SummaryWriter("./tf_logs", graph=sess.graph)
 
-for i in range(5001):
+for i in range(5000):
     batch = mnist.train.next_batch(batch_size)
     batch_images = batch[0]
 
@@ -208,7 +208,10 @@ for i in range(5001):
         sampled_zs = np.random.uniform(low=-1, high=1, size=(batch_size, z_dim)).astype(np.float32)
         sess.run(g_optim, feed_dict={ z: sampled_zs })
 
-    if i % 100 == 0: _print_loss(i, sess, sampled_zs, batch_images, d_acc, d_loss, g_loss)
-    if i % 500 == 0: _produce_generator_image_batch(i, sess)
+    # if i % 100 == 0: _print_loss(i, sess, sampled_zs, batch_images, d_acc, d_loss, g_loss)
+    # if i % 500 == 0: _produce_generator_image_batch(i, sess)
+
+_produce_generator_image_batch('latest', sess)
 
 summary_writer.close()
+sess.close()
