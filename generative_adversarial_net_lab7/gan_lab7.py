@@ -173,37 +173,39 @@ with tf.name_scope('optimizers'):
 # ==================================================================
 #
 
-sess = tf.Session()
-sess.run( tf.initialize_all_variables() )
-summary_writer = tf.train.SummaryWriter( "./tf_logs", graph=sess.graph )
+def _print_loss(step, sess, sampled_zs, batch_images, d_acc, d_loss, g_loss):
+    d_acc_val, d_loss_val, g_loss_val = sess.run([d_acc, d_loss, g_loss],
+                                                feed_dict={ z: sampled_zs, true_images: batch_images })
+    print "%d\t%.2f %.2f %.2f" % (step, d_loss_val, g_loss_val, d_acc_val)
 
-for i in range(500):
+def _produce_generator_image_batch(step, sess):
+	sampled_zs = np.random.uniform(-1, 1, size=(batch_size, z_dim)).astype(np.float32)
+	simgs = sess.run(sample_images, feed_dict={ z:sampled_zs })
+	simgs = simgs[0:64,:]
+
+	tiles = []
+	for i in range(0,8):
+	    tiles.append(np.reshape(simgs[i*8:(i+1)*8,:], [28*8,28]))
+	plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=mpl.cm.gray)
+	plt.savefig('generator_imgs/img_step{}.png'.format(step))
+
+sess = tf.Session()
+sess.run(tf.initialize_all_variables())
+summary_writer = tf.train.SummaryWriter("./tf_logs", graph=sess.graph)
+
+for i in range(5001):
     batch = mnist.train.next_batch(batch_size)
     batch_images = batch[0]
 
     # train discriminator once
     sampled_zs = np.random.uniform(low=-1, high=1, size=(batch_size, z_dim)).astype(np.float32)
-    sess.run(d_optim, feed_dict={ z:sampled_zs, true_images: batch_images })
+    sess.run(d_optim, feed_dict={ z: sampled_zs, true_images: batch_images })
     # train generator 3 times for every one generator step
     for _ in range(3):
         sampled_zs = np.random.uniform(low=-1, high=1, size=(batch_size, z_dim)).astype(np.float32)
-        sess.run(g_optim, feed_dict={ z:sampled_zs })
+        sess.run(g_optim, feed_dict={ z: sampled_zs })
 
-    if i%10==0:
-        d_acc_val, d_loss_val, g_loss_val = sess.run([d_acc, d_loss, g_loss],
-                                                    feed_dict={ z:sampled_zs, true_images: batch_images })
-        print "%d\t%.2f %.2f %.2f" % (i, d_loss_val, g_loss_val, d_acc_val)
+    if i % 100 == 0: _print_loss(i, sess, sampled_zs, batch_images, d_acc, d_loss, g_loss)
+    if i % 500 == 0: _produce_generator_image_batch(i, sess)
 
 summary_writer.close()
-
-#  show some results
-sampled_zs = np.random.uniform(-1, 1, size=(batch_size, z_dim)).astype(np.float32)
-simgs = sess.run(sample_images, feed_dict={ z:sampled_zs })
-simgs = simgs[0:64,:]
-
-tiles = []
-for i in range(0,8):
-    tiles.append(np.reshape( simgs[i*8:(i+1)*8,:], [28*8,28]))
-plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=mpl.cm.gray)
-plt.colorbar()
-plt.savefig('generator_output.png')
