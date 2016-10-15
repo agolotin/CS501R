@@ -81,23 +81,23 @@ def lrelu(x, leak=0.2, name="lrelu"):
 # z will be [None,z_dim]
 
 def generator_op(z):
-	with tf.name_scope('g_h1'):
-		# a linear layer, mapping z to 128*7*7 features
-		g_h1_linear = linear(z, 128*7*7, name='g_h1_linear')
-	# nonlinearity after the linear layer
-	g_h1_relu = tf.nn.relu(g_h1_linear)
-	# reshape to match deconvolution layer shape
-	g_h1_reshaped = tf.reshape(g_h1_relu, shape=[batch_size, 7, 7, 128])
-	with tf.name_scope('g_d2'):
-		# a deconvolution layer, mapping H1 to a tensor that is [batch_size,14,14,128], followed by a relu
-		g_d2_deconv = deconv2d(g_h1_reshaped, [batch_size, 14, 14, 128], name='g_d2_deconv')
-	# nonlinearity after the deconvolution
-	g_d2_relu = tf.nn.relu(g_d2_deconv)
-	with tf.name_scope('g_d3'):
-		# a deconvolution layer, mapping D2 to a tensor that is [batch_size,28,28,1]
-		g_d3_deconv = deconv2d(g_d2_relu, [batch_size, 28, 28, 1], name='g_d3_deconv')
-	# final output
-	return tf.sigmoid(tf.reshape(g_d3_deconv, [batch_size, 784], name='g_d3_reshape'))
+    with tf.name_scope('g_h1'):
+        # a linear layer, mapping z to 128*7*7 features
+        g_h1_linear = linear(z, 128*7*7, name='g_h1_linear')
+    # nonlinearity after the linear layer
+    g_h1_relu = tf.nn.relu(g_h1_linear)
+    # reshape to match deconvolution layer shape
+    g_h1_reshaped = tf.reshape(g_h1_relu, shape=[batch_size, 7, 7, 128])
+    with tf.name_scope('g_d2'):
+        # a deconvolution layer, mapping H1 to a tensor that is [batch_size,14,14,128], followed by a relu
+        g_d2_deconv = deconv2d(g_h1_reshaped, [batch_size, 14, 14, 128], name='g_d2_deconv')
+    # nonlinearity after the deconvolution
+    g_d2_relu = tf.nn.relu(g_d2_deconv)
+    with tf.name_scope('g_d3'):
+        # a deconvolution layer, mapping D2 to a tensor that is [batch_size,28,28,1]
+        g_d3_deconv = deconv2d(g_d2_relu, [batch_size, 28, 28, 1], name='g_d3_deconv')
+    # final output
+    return tf.sigmoid(tf.reshape(g_d3_deconv, [batch_size, 784], name='g_d3_reshape'))
 
 # -------------------------------------------
     
@@ -106,24 +106,24 @@ def generator_op(z):
 # imgs will be [None,784]
 
 def discriminator_op(imgs, reuse=None):
-	# reshape input images to match the convolution layer
-	d_reshaped_imgs = tf.reshape(imgs, [batch_size, 28, 28, 1], name='reshape_images')
-	with tf.name_scope('d_h0'):
-		# a 2d convolution on imgs with 32 filters, followed by a leaky relu
-		d_h0_conv = lrelu(conv2d(d_reshaped_imgs, 32, name='d_h0_conv', reuse=reuse))
-	with tf.name_scope('d_h1'):
-		# a 2d convolution on H0 with 64 filters, followed by a leaky relu
-		d_h1_conv = lrelu(conv2d(d_h0_conv, 64, name='d_h1_conv', reuse=reuse))
-		# reshape for the linear layer
-		d_h1_reshaped = tf.reshape(d_h1_conv, [batch_size, -1], 'd_h1_reshape')
-	with tf.name_scope('d_h2'):
-		# a linear layer from H1 to a 1024 dimensional vector
-		d_h2_linear = linear(d_h1_reshaped, 1024, name='d_h2_linear', reuse=reuse)
-	with tf.name_scope('d_h3'):
-		# a linear layer mapping H2 to a single scalar (per image)
-		d_h3_linear = linear(d_h2_linear, 1, name='d_h3_linear', reuse=reuse)
-	# final output
-	return tf.sigmoid(d_h3_linear)
+    # reshape input images to match the convolution layer
+    d_reshaped_imgs = tf.reshape(imgs, [batch_size, 28, 28, 1], name='reshape_images')
+    with tf.name_scope('d_h0'):
+        # a 2d convolution on imgs with 32 filters, followed by a leaky relu
+        d_h0_conv = lrelu(conv2d(d_reshaped_imgs, 32, name='d_h0_conv', reuse=reuse))
+    with tf.name_scope('d_h1'):
+        # a 2d convolution on H0 with 64 filters, followed by a leaky relu
+        d_h1_conv = lrelu(conv2d(d_h0_conv, 64, name='d_h1_conv', reuse=reuse))
+        # reshape for the linear layer
+        d_h1_reshaped = tf.reshape(d_h1_conv, [batch_size, -1], 'd_h1_reshape')
+    with tf.name_scope('d_h2'):
+        # a linear layer from H1 to a 1024 dimensional vector
+        d_h2_linear = linear(d_h1_reshaped, 1024, name='d_h2_linear', reuse=reuse)
+    with tf.name_scope('d_h3'):
+        # a linear layer mapping H2 to a single scalar (per image)
+        d_h3_linear = linear(d_h2_linear, 1, name='d_h3_linear', reuse=reuse)
+    # final output
+    return tf.sigmoid(d_h3_linear)
 
 
 # ==================================================================
@@ -131,43 +131,43 @@ def discriminator_op(imgs, reuse=None):
 # ==================================================================
 
 with tf.name_scope('models'):
-	with tf.name_scope('generator'):
-		# randomly sampled vector that will be mapped to an image
-		z = tf.placeholder(tf.float32, shape=[None, z_dim], name='z')
-		# pass the z variable into the generative model and get some fake images
-		sample_images = generator_op(z)
-	with tf.name_scope('discriminator'):
-		true_images = tf.placeholder(tf.float32, shape=[None, 784], name='true_images')
-		# pass some true images into the discriminator without reusing them first
-		d_true_probs = discriminator_op(true_images, reuse=False)
-		# pass some sampled images into the discriminator and reuse the same variables
-		d_fake_probs = discriminator_op(sample_images, reuse=True)
+    with tf.name_scope('generator'):
+        # randomly sampled vector that will be mapped to an image
+        z = tf.placeholder(tf.float32, shape=[None, z_dim], name='z')
+        # pass the z variable into the generative model and get some fake images
+        sample_images = generator_op(z)
+    with tf.name_scope('discriminator'):
+        true_images = tf.placeholder(tf.float32, shape=[None, 784], name='true_images')
+        # pass some true images into the discriminator without reusing them first
+        d_true_probs = discriminator_op(true_images, reuse=False)
+        # pass some sampled images into the discriminator and reuse the same variables
+        d_fake_probs = discriminator_op(sample_images, reuse=True)
 
 with tf.name_scope('loss_functions'):
-	with tf.name_scope('d_loss'):
-		# discriminator loss function:
-		#	maximize the log of the output probabilities on the true images 
-		#	and the log of 1.0 - the output probabilities on the sampled images
-		d_loss = tf.reduce_mean(-tf.add(tf.log(d_true_probs), tf.log(1 - d_fake_probs)))
-	with tf.name_scope('g_loss'):
-		# generator loss function:
-		# maximize the log of the output probabilities on the sampled images
-		g_loss = tf.reduce_mean(-tf.log(d_fake_probs))
-	with tf.name_scope('d_acc'):
-		# compute discriminator accuracy
-		d_true_acc = tf.reduce_mean(tf.cast(tf.greater(d_true_probs, 0.5), tf.float32))
-		d_fake_acc = tf.reduce_mean(tf.cast(tf.greater(d_fake_probs, 0.5), tf.float32))
-		d_acc = tf.truediv(tf.add(d_true_acc, d_fake_acc), 2.0)
+    with tf.name_scope('d_loss'):
+        # discriminator loss function:
+        #    maximize the log of the output probabilities on the true images 
+        #    and the log of 1.0 - the output probabilities on the sampled images
+        d_loss = tf.reduce_mean(-tf.add(tf.log(d_true_probs), tf.log(1 - d_fake_probs)))
+    with tf.name_scope('g_loss'):
+        # generator loss function:
+        # maximize the log of the output probabilities on the sampled images
+        g_loss = tf.reduce_mean(-tf.log(d_fake_probs))
+    with tf.name_scope('d_acc'):
+        # compute discriminator accuracy
+        d_true_acc = tf.reduce_mean(tf.cast(tf.greater(d_true_probs, 0.5), tf.float32))
+        d_fake_acc = tf.reduce_mean(tf.cast(tf.greater(d_fake_probs, 0.5), tf.float32))
+        d_acc = tf.truediv(tf.add(d_true_acc, d_fake_acc), 2.0)
 
 with tf.name_scope('optimizers'):
-	with tf.name_scope('d_optimizer'):
-		# Only optimize the discriminator variables for discriminator step
-		d_vars = filter(lambda var: 'd_' in var.name, tf.trainable_variables())
-		d_optim = tf.train.AdamOptimizer(2e-3, beta1=0.5).minimize(d_loss, var_list=d_vars)
-	with tf.name_scope('g_optimizer'):
-		# Only optimize the generator variables for generator step
-		g_vars = filter(lambda var: 'g_' in var.name, tf.trainable_variables())
-		g_optim = tf.train.AdamOptimizer(2e-3, beta1=0.5).minimize(g_loss, var_list=g_vars)
+    with tf.name_scope('d_optimizer'):
+        # Only optimize the discriminator variables for discriminator step
+        d_vars = filter(lambda var: 'd_' in var.name, tf.trainable_variables())
+        d_optim = tf.train.AdamOptimizer(2e-3, beta1=0.5).minimize(d_loss, var_list=d_vars)
+    with tf.name_scope('g_optimizer'):
+        # Only optimize the generator variables for generator step
+        g_vars = filter(lambda var: 'g_' in var.name, tf.trainable_variables())
+        g_optim = tf.train.AdamOptimizer(2e-3, beta1=0.5).minimize(g_loss, var_list=g_vars)
 
 #
 # ==================================================================
@@ -181,16 +181,19 @@ def _print_loss(step, sess, sampled_zs, batch_images, d_acc, d_loss, g_loss):
     print("%d\t%.2f %.2f %.2f" % (step, d_loss_val, g_loss_val, d_acc_val))
 
 def _produce_generator_image_batch(step, sess):
-	sampled_zs = np.random.uniform(-1, 1, size=(batch_size, z_dim)).astype(np.float32)
-	simgs = sess.run(sample_images, feed_dict={ z:sampled_zs })
-	simgs = simgs[0:64,:]
+    sampled_zs = np.random.uniform(-1, 1, size=(batch_size, z_dim)).astype(np.float32)
+    simgs = sess.run(sample_images, feed_dict={ z:sampled_zs })
+    simgs = simgs[0:64,:]
 
-	tiles = []
-	for i in range(0,8):
-	    tiles.append(np.reshape(simgs[i*8:(i+1)*8,:], [28*8,28]))
-	plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=mpl.cm.gray)
-	plt.colorbar()
-	plt.savefig('generator_imgs/img_{}.png'.format(step))
+    tiles = []
+    for i in range(0,8):
+        tiles.append(np.reshape(simgs[i*8:(i+1)*8,:], [28*8,28]))
+    plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=mpl.cm.gray)
+    plt.colorbar()
+    plt.savefig('generator_imgs/img_{}.png'.format(step))
+    # clear the plot for the next one
+    plt.gcf().clear()
+
 
 sess = tf.Session()
 sess.run(tf.initialize_all_variables())
