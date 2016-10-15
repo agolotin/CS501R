@@ -204,6 +204,6 @@ simgs = simgs[0:64,:]
 tiles = []
 for i in range(0,8):
     tiles.append(np.reshape( simgs[i*8:(i+1)*8,:], [28*8,28]))
-plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=matplotlib.cm.gray)
+plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=mpl.cm.gray)
 plt.colorbar()
-plt.show()
+plt.savefig('generator_output.png')
