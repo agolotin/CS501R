@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --time=0:10:00   # walltime
-#SBATCH --ntasks=6   # number of processor cores (i.e. tasks)
+#SBATCH --time=0:20:00   # walltime
+#SBATCH --ntasks=4   # number of processor cores (i.e. tasks)
 #SBATCH --nodes=1   # number of nodes
 #SBATCH --gres=gpu:4 # number of GPUs
 #SBATCH --mem-per-cpu=10240M   # memory per CPU core

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
@@ -176,7 +178,7 @@ with tf.name_scope('optimizers'):
 def _print_loss(step, sess, sampled_zs, batch_images, d_acc, d_loss, g_loss):
     d_acc_val, d_loss_val, g_loss_val = sess.run([d_acc, d_loss, g_loss],
                                                 feed_dict={ z: sampled_zs, true_images: batch_images })
-    print "%d\t%.2f %.2f %.2f" % (step, d_loss_val, g_loss_val, d_acc_val)
+    print("%d\t%.2f %.2f %.2f" % (step, d_loss_val, g_loss_val, d_acc_val))
 
 def _produce_generator_image_batch(step, sess):
 	sampled_zs = np.random.uniform(-1, 1, size=(batch_size, z_dim)).astype(np.float32)
@@ -187,7 +189,8 @@ def _produce_generator_image_batch(step, sess):
 	for i in range(0,8):
 	    tiles.append(np.reshape(simgs[i*8:(i+1)*8,:], [28*8,28]))
 	plt.imshow(np.hstack(tiles), interpolation='nearest', cmap=mpl.cm.gray)
-	plt.savefig('generator_imgs/img_step{}.png'.format(step))
+	plt.colorbar()
+	plt.savefig('generator_imgs/img_step_{}.png'.format(step))
 
 sess = tf.Session()
 sess.run(tf.initialize_all_variables())
