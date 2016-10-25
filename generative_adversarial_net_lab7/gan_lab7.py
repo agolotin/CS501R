@@ -156,7 +156,7 @@ with tf.name_scope('loss_functions'):
     with tf.name_scope('d_acc'):
         # compute discriminator accuracy
         d_true_acc = tf.reduce_mean(tf.cast(tf.greater(d_true_probs, 0.5), tf.float32))
-        d_fake_acc = tf.reduce_mean(tf.cast(tf.greater(d_fake_probs, 0.5), tf.float32))
+        d_fake_acc = tf.reduce_mean(tf.cast(tf.less(d_fake_probs, 0.5), tf.float32))
         d_acc = tf.truediv(tf.add(d_true_acc, d_fake_acc), 2.0)
 
 with tf.name_scope('optimizers'):
