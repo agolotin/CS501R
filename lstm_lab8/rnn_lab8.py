@@ -35,16 +35,16 @@ class GRUCell(RNNCell):
     def output_size(self):
         return self._num_units
  
-    def __call__(self, inputs, state):
+    def __call__(self, inputs, h):
         with tf.variable_scope('GRUCell'):
             with tf.variable_scope('gates'):
-                temp = _linear([inputs, state], 2 * self._num_units, True, 1.0)
+                temp = _linear([inputs, h], 2 * self._num_units, True, 1.0)
                 _r, _z = array_ops.split(1, 2, temp)
                 r, z  = sigmoid(_r), sigmoid(_z)
             with tf.variable_scope('memory'):
-                temp = _linear([inputs, r * state], self._num_units, True, 1.0)
+                temp = _linear([inputs, r * h], self._num_units, True, 1.0)
                 h_tilda = tanh(temp)
-            new_h = z * state + (1 - z) * h_tilda
+            new_h = z * h + (1 - z) * h_tilda
         return new_h, new_h
 
 
@@ -231,7 +231,8 @@ for j in range(1000):
             print "%d %d\t%.4f" % (j, i, lt)
             lts.append(lt)
 
-    print sample(num=150, prime=choice(letters).upper())
+    print sample(num=140, prime=choice(letters).upper())
+    print sample(num=140, prime='@')
 #    print sample(num=60, prime="And ")
 #    print sample( num=60, prime="ababab" )
 #    print sample( num=60, prime="foo ba" )
