@@ -17,12 +17,12 @@ tf.reset_default_graph()
 def global_avg_pool(in_var, name='global_pool'):
     assert name is not None, 'Op name should be specified'
 
-    input_shape = in_var.get_shape()
-    assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
-
     with tf.name_scope(name):
+        input_shape = in_var.get_shape()
+        assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
+
         inference = tf.reduce_mean(in_var, [1, 2])
-    return inference
+        return inference
 
 
 def max_pool(in_var, kernel_size=[1,2,2,1], strides=[1,1,1,1], 
@@ -34,9 +34,7 @@ def max_pool(in_var, kernel_size=[1,2,2,1], strides=[1,1,1,1],
         input_shape = in_var.get_shape()
         assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
 
-        with tf.name_scope(name) as scope:
-            inference = tf.nn.max_pool(in_var, kernel_size, strides, padding)
-
+        inference = tf.nn.max_pool(in_var, kernel_size, strides, padding)
         return inference
 
 
@@ -45,12 +43,11 @@ def avg_pool_2d(in_var, kernel_size=[1,2,2,1], strides=None,
     assert name is not None, 'Op name should be specified'
     assert strides is not None, 'Strides should be specified when performing average pooling'
     # 
-    with tf.name_scope(name) as scope:
+    with tf.name_scope(name):
         input_shape = in_var.get_shape()
         assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
 
         inference = tf.nn.avg_pool(in_var, kernel_size, strides, padding)
-
         return inference
 
 def conv_2d(in_var, out_channels, filters=[3,3], strides=[1,1,1,1], 
@@ -67,17 +64,6 @@ def conv_2d(in_var, out_channels, filters=[3,3], strides=[1,1,1,1],
         conv = tf.reshape(tf.nn.bias_add(conv, b), conv.get_shape())
 
         return conv
-
-def linear(in_var, output_size, name=None, stddev=0.02, bias_val=0.0):
-    assert name is not None, 'Op name should be specified'
-    # 
-    with tf.name_scope(name):
-        shape = in_var.get_shape().as_list()
-        W = tf.get_variable(name + "_W", [shape[1], output_size], tf.float32,
-                              tf.random_normal_initializer(stddev=stddev))
-        b = tf.get_variable(name + "_b", [output_size],
-                             initializer=tf.constant_initializer(bias_val))
-        return tf.matmul(in_var, W) + b
 
 def residual_block(in_var, nb_blocks, out_channels, batch_norm=False, strides=[1,1,1,1],
                     downsample=False, downsample_strides=[1,2,2,1], name=None):
@@ -144,10 +130,10 @@ def residual_network(x):
 
 def compute_energy(o1, o2):
     with tf.name_scope('energy'):
-        _energy = tf.reduce_sum(tf.pow(tf.sub(o1, o2), 2), reduction_indices=1)
+        _energy = tf.reduce_sum(tf.abs(tf.sub(o1, o2)), reduction_indices=[1])
         return _energy
 
-def compute_loss(y_, o1, o2, energy, margin=None):
+def compute_loss(y_, o1, o2, energy, margin):
     with tf.name_scope('loss'):
         labels_t = y_
         labels_f = tf.sub(1.0, y_, name="1-y")
@@ -163,7 +149,7 @@ def compute_loss(y_, o1, o2, energy, margin=None):
 
 def compute_accuracy(true_y, pred_y, margin):
     with tf.name_scope('accuracy'):
-        _pred_y = tf.cast(tf.less(pred_y, margin/2), tf.float32)
+        _pred_y = tf.cast(tf.less(pred_y, margin), tf.float32)
         _acc = tf.reduce_mean(tf.mul(true_y, _pred_y))
         return _acc
 
@@ -178,7 +164,7 @@ with tf.variable_scope("siamese") as scope:
     siamese2 = residual_network(x2)
 
 # Calculate energy, loss, and accuracy
-margin = 4.0
+margin = 2.0
 y_ = tf.placeholder(tf.float32, [None, 1])
 energy_op = compute_energy(siamese1, siamese2)
 loss_op = compute_loss(y_, siamese1, siamese2, energy_op, margin)
