@@ -9,8 +9,8 @@ import numpy as np
 import os
 import sys
 
-batch_size = 50
-resnet_units = 3
+batch_size = 128
+resnet_units = 6
 
 tf.reset_default_graph()
 
@@ -128,15 +128,15 @@ def batch_normalization(in_var):
 def residual_network(x):
     with tf.name_scope('residual_network'):
         _x = tf.reshape(x, [batch_size, 250, 250, 1])
-        net = conv_2d(_x, 16, filters=[7,7], strides=[1,2,2,1], name='conv_0')
+        net = conv_2d(_x, 8, filters=[7,7], strides=[1,2,2,1], name='conv_0')
         net = max_pool(net, name='max_pool_0')
-        net = residual_block(net, resnet_units, 16, name='resblock_1')
-        net = residual_block(net, 1, 32, downsample=True, name='resblock_1-5')
-        net = residual_block(net, resnet_units, 32, name='resblock_2')
-        net = residual_block(net, 1, 64, downsample=True, name='resblock_2-5')
-        net = residual_block(net, resnet_units, 64, name='resblock_3')
-        # net = residual_block(net, 1, 128, downsample=True, name='resblock_3-5')
-        # net = residual_block(net, resnet_units, 128, name='resblock_4')
+        net = residual_block(net, resnet_units, 8, name='resblock_1')
+        net = residual_block(net, 1, 16, downsample=True, name='resblock_1-5')
+        net = residual_block(net, resnet_units, 16, name='resblock_2')
+        net = residual_block(net, 1, 32, downsample=True, name='resblock_2-5')
+        net = residual_block(net, resnet_units, 32, name='resblock_3')
+        # net = residual_block(net, 1, 64, downsample=True, name='resblock_3-5')
+        # net = residual_block(net, resnet_units, 64, name='resblock_4')
         # batch normalize
         net = tf.nn.relu(net)
         net = global_avg_pool(net)
@@ -190,9 +190,9 @@ train_step = tf.train.AdamOptimizer(1e-3).minimize(loss_op)
 # prepare data and tf.session
 faces = ImageLoader()
 sess = tf.Session()
+summary_writer = tf.train.SummaryWriter("./tf_logs", graph=sess.graph)
 
 sess.run(tf.initialize_all_variables())
-
 for step in xrange(int(60e4)):
     batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(batch_size)
     batch_y = (batch_y1 == batch_y2).astype(np.float32)
@@ -207,3 +207,7 @@ for step in xrange(int(60e4)):
     if step % 10 == 0:
         print ('step %d: loss %.3f accuracy: %.3f' % (step, loss_v, acc_v))
         sys.stdout.flush()
+
+
+summary_writer.close()
+sess.close()
