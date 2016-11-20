@@ -3,3 +3,6 @@
 */MNIST_data/
 .DS_Store
 */tf_logs/
+*/fr.2650.0.lfw2.tar
+*/lfw2/
+*pyc
