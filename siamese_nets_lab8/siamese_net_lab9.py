@@ -7,9 +7,10 @@ import tensorflow as tf
 import numpy as np
 
 import os
+import sys
 
-batch_size = 2
-resnet_units = 2
+batch_size = 50
+resnet_units = 3
 
 tf.reset_default_graph()
 
@@ -127,15 +128,15 @@ def batch_normalization(in_var):
 def residual_network(x):
     with tf.name_scope('residual_network'):
         _x = tf.reshape(x, [batch_size, 250, 250, 1])
-        net = conv_2d(_x, 64, filters=[7,7], strides=[1,2,2,1], name='conv_0')
+        net = conv_2d(_x, 16, filters=[7,7], strides=[1,2,2,1], name='conv_0')
         net = max_pool(net, name='max_pool_0')
-        net = residual_block(net, resnet_units, 64, name='resblock_1')
-        net = residual_block(net, 1, 128, downsample=True, name='resblock_1-5')
-        net = residual_block(net, resnet_units, 128, name='resblock_2')
-        net = residual_block(net, 1, 256, downsample=True, name='resblock_2-5')
-        net = residual_block(net, resnet_units, 256, name='resblock_3')
-        net = residual_block(net, 1, 512, downsample=True, name='resblock_3-5')
-        net = residual_block(net, resnet_units, 512, name='resblock_4')
+        net = residual_block(net, resnet_units, 16, name='resblock_1')
+        net = residual_block(net, 1, 32, downsample=True, name='resblock_1-5')
+        net = residual_block(net, resnet_units, 32, name='resblock_2')
+        net = residual_block(net, 1, 64, downsample=True, name='resblock_2-5')
+        net = residual_block(net, resnet_units, 64, name='resblock_3')
+        # net = residual_block(net, 1, 128, downsample=True, name='resblock_3-5')
+        # net = residual_block(net, resnet_units, 128, name='resblock_4')
         # batch normalize
         net = tf.nn.relu(net)
         net = global_avg_pool(net)
@@ -160,6 +161,13 @@ def compute_loss(y_, o1, o2, energy, margin=None):
         _loss = tf.reduce_mean(tf.add(pos, neg), name='loss')
         return _loss
 
+def compute_accuracy(true_y, pred_y, margin):
+    with tf.name_scope('accuracy'):
+        _pred_y = tf.cast(tf.less(pred_y, margin/2), tf.float32)
+        _acc = tf.reduce_mean(tf.mul(true_y, _pred_y))
+        return _acc
+
+
 # Create model
 x1 = tf.placeholder(tf.float32, [None, 250, 250])
 x2 = tf.placeholder(tf.float32, [None, 250, 250])
@@ -174,6 +182,7 @@ margin = 4.0
 y_ = tf.placeholder(tf.float32, [None, 1])
 energy_op = compute_energy(siamese1, siamese2)
 loss_op = compute_loss(y_, siamese1, siamese2, energy_op, margin)
+accuracy_op = compute_accuracy(y_, energy_op, margin)
 
 # setup siamese network
 train_step = tf.train.AdamOptimizer(1e-3).minimize(loss_op)
@@ -189,11 +198,12 @@ for step in xrange(int(60e4)):
     batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
     feed = {x1: batch_x1, x2: batch_x2, y_: batch_y}
-    _, energy, loss_v = sess.run([train_step, energy_op, loss_op], feed_dict=feed)
+    _, loss_v, acc_v = sess.run([train_step, loss_op, accuracy_op], feed_dict=feed)
 
     if np.isnan(loss_v):
         print('Model diverged with loss = NaN')
         quit()
 
     if step % 10 == 0:
-        print ('step %d: loss %.3f' % (step, loss_v))
+        print ('step %d: loss %.3f accuracy: %.3f' % (step, loss_v, acc_v))
+        sys.stdout.flush()
