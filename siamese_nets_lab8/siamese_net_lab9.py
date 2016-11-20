@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import division
 
 from pdb import set_trace as debugger
 from imageloader import ImageLoader
@@ -11,7 +12,7 @@ import os
 import sys
 
 batch_size = 128
-resnet_units = 6
+resnet_units = 3
 
 tf.reset_default_graph()
 
@@ -62,7 +63,7 @@ def conv_2d(in_var, out_channels, filters=[3,3], strides=[1,1,1,1],
         b = tf.get_variable(name + "_b", [out_channels], initializer=tf.constant_initializer(0.0))
 
         conv = tf.nn.conv2d(in_var, W, strides=strides, padding=padding) + b
-        # conv = tf.reshape(tf.nn.bias_add(conv, b), conv.get_shape())
+        conv = tf.reshape(tf.nn.bias_add(conv, b), conv.get_shape())
 
         return conv
 
@@ -77,15 +78,24 @@ def residual_block(in_var, nb_blocks, out_channels, batch_norm=True, strides=[1,
         # multiple layers for a single residual block
         for i in xrange(nb_blocks):
             identity = resnet
+            ##################
             # apply convolution
             resnet = conv_2d(resnet, out_channels, 
                             strides=strides if not downsample else downsample_strides, 
                             name='{}_conv2d_{}'.format(name, i))
             # normalize batch before activations
             if batch_norm:
-                resnet = batch_normalization(resnet, name=name+'_batch_norm', reuse=None if i == 0 else True)
+                resnet = batch_normalization(resnet, name='{}_batch_norm{}'.format(name, i))
             # apply activation function
             resnet = tf.nn.relu(resnet)
+            # apply convolution again
+            resnet = conv_2d(resnet, out_channels, strides=strides, name='{}_conv2d_{}{}'.format(name, i, 05))
+            # normalize batch before activations or previous convolution
+            if batch_norm:
+                resnet = batch_normalization(resnet, name='{}_batch_norm{}'.format(name, i), reuse=True)
+            # apply activation function
+            resnet = tf.nn.relu(resnet)
+            ##################
             # downsample
             if downsample:
                 identity = avg_pool_2d(identity, strides=downsample_strides, name=name+'_avg_pool_2d')
@@ -99,7 +109,8 @@ def residual_block(in_var, nb_blocks, out_channels, batch_norm=True, strides=[1,
 
         return resnet
 
-def batch_normalization(in_var, beta=0.0, gamma=1.0, epsilon=1e-5, decay=0.9, name=None, reuse=None):
+def batch_normalization(in_var, beta=0.0, gamma=1.0, epsilon=1e-5, 
+                        decay=0.9, name=None, reuse=None):
     assert name is not None, 'Op name should be specified'
     # start batch normalization with moving averages
     input_shape = in_var.get_shape().as_list()
@@ -140,18 +151,18 @@ def batch_normalization(in_var, beta=0.0, gamma=1.0, epsilon=1e-5, decay=0.9, na
 
 def residual_network(x):
     with tf.name_scope('residual_network') as scope:
-        _x = tf.reshape(x, [-1, 250, 250, 1])
+        _x = tf.reshape(x, [batch_size, 250, 250, 1])
         net = conv_2d(_x, 8, filters=[7,7], strides=[1,2,2,1], name='conv_0')
         net = max_pool(net, name='max_pool_0')
         net = residual_block(net, resnet_units, 8, name='resblock_1')
         net = residual_block(net, 1, 16, downsample=True, name='resblock_1-5')
-        net = residual_block(net, resnet_units, 16, name='resblock_2')
+        net = residual_block(net, resnet_units+1, 16, name='resblock_2')
         net = residual_block(net, 1, 24, downsample=True, name='resblock_2-5')
-        net = residual_block(net, resnet_units, 24, name='resblock_3')
+        net = residual_block(net, resnet_units+2, 24, name='resblock_3')
         net = residual_block(net, 1, 32, downsample=True, name='resblock_3-5')
         net = residual_block(net, resnet_units, 32, name='resblock_4')
-        net = batch_normalization(net, name='batch_norm')
-        net = tf.nn.relu(net)
+        # net = batch_normalization(net, name='batch_norm')
+        # net = tf.nn.relu(net)
         net = global_avg_pool(net)
         return net
 
@@ -165,18 +176,18 @@ def compute_loss(y_, energy):
         labels_t = y_
         labels_f = tf.sub(1.0, y_, name="1-y")
         # compute loss_g and loss_i
-        loss_g = tf.mul(0.5, tf.pow(energy, 2), name='l_G')
-        loss_i = tf.mul(0.5, tf.pow(tf.maximum(0.0, tf.sub(margin, energy)), 2), name='l_I')
+        loss_g = tf.mul(tf.truediv(2.0, margin), tf.pow(energy, 2), name='l_G')
+        loss_i = tf.mul(tf.mul(2.0, margin), tf.exp(tf.mul(tf.truediv(-2.77, margin), energy)), name='l_I')
         # compute full loss
-        pos = tf.mul(labels_f, loss_g, name='1-Yl_G')
-        neg = tf.mul(labels_t, loss_i, name='Yl_I')
+        pos = tf.mul(labels_t, loss_g, name='1-Yl_G')
+        neg = tf.mul(labels_f, loss_i, name='Yl_I')
         _loss = tf.reduce_mean(tf.add(pos, neg), name='loss')
         return _loss
 
 def compute_accuracy(true_y, pred_y):
     with tf.name_scope('accuracy'):
         _pred_y = tf.cast(tf.less(pred_y, margin), tf.float32)
-        _acc = tf.reduce_mean(tf.mul(true_y, _pred_y))
+        _acc = tf.reduce_mean(tf.cast(tf.equal(true_y, _pred_y), tf.float32))
         return _acc
 
 
@@ -198,7 +209,7 @@ loss_op = compute_loss(y_, energy_op)
 accuracy_op = compute_accuracy(y_, energy_op)
 
 # setup siamese network
-train_step = tf.train.AdamOptimizer(1e-3).minimize(loss_op)
+train_step = tf.train.AdamOptimizer(1e-3, beta1=0.5).minimize(loss_op)
 
 # prepare data and tf.session
 faces = ImageLoader()
@@ -210,17 +221,15 @@ for step in xrange(int(60e4)):
     batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(batch_size)
     batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
-    feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: True, margin: 2.7}
+    feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: True, margin: 1.25}
     _, loss_v, en, acc_v = sess.run([train_step, loss_op, energy_op, accuracy_op], feed_dict=feed)
 
     if np.isnan(loss_v):
         print('Model diverged with loss = NaN')
         sys.exit()
     if step % 10 == 0:
-        _see = (en < 2.7).astype('float')
-        _y = batch_y
-        debugger()
         print('step {0}: loss {1} accuracy: {2}'.format(step, loss_v, acc_v))
+    '''
     if step % 1000 == 0:
         batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(1000, train=False)
         batch_y = (batch_y1 == batch_y2).astype(np.float32)
@@ -228,6 +237,7 @@ for step in xrange(int(60e4)):
         feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: False, margin: 2.7}
         t_acc = sess.run(accuracy_op, feed_dict=feed)
         print('train set accuracy: {0}'.format(t_acc))
+    '''
 
     sys.stdout.flush()
 
