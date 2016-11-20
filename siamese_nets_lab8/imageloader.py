@@ -96,8 +96,8 @@ class ImageLoader(object):
         img2 = random.choice(self.images[name])
         return img1, img2
 
-    def next_batch(self, batch_size):
-        return self.create_pairs(batch_size)
+    def next_batch(self, batch_size, train=True):
+        return self.create_pairs(batch_size, train)
 
 
 if __name__ == '__main__':
