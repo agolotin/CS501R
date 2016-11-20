@@ -13,9 +13,9 @@ resnet_units = 5
 
 def global_avg_pool(in_var, name='global_pool'):
     assert name is not None, 'Op name should be specified'
-    assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
 
     input_shape = in_var.get_shape()
+    assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
 
     with tf.name_scope(name):
         inference = tf.reduce_mean(in_var, [1, 2])
@@ -25,10 +25,10 @@ def global_avg_pool(in_var, name='global_pool'):
 def max_pool(in_var, kernel_size=[1,2,2,1], strides=[1,1,1,1], 
             padding='SAME', name=None):
     assert name is not None, 'Op name should be specified'
+    assert strides is not None, 'Strides should be specified when performing max pooling'
     # 
     with tf.name_scope(name):
         input_shape = in_var.get_shape()
-        assert strides is not None, 'Strides should be specified when performing average pooling'
         assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
 
         with tf.name_scope(name) as scope:
@@ -37,13 +37,13 @@ def max_pool(in_var, kernel_size=[1,2,2,1], strides=[1,1,1,1],
         return inference
 
 
-def avg_pool_2d(in_var, kernel_size=[1,1,1,1], strides=None, 
+def avg_pool_2d(in_var, kernel_size=[1,2,2,1], strides=None, 
                 padding='SAME', name=None):
     assert name is not None, 'Op name should be specified'
+    assert strides is not None, 'Strides should be specified when performing average pooling'
     # 
     with tf.name_scope(name) as scope:
         input_shape = in_var.get_shape()
-        assert strides is not None, 'Strides should be specified when performing average pooling'
         assert len(input_shape) == 4, 'Incoming Tensor shape must be 4-D'
 
         inference = tf.nn.avg_pool(in_var, kernel_size, strides, padding)
@@ -76,7 +76,7 @@ def linear(in_var, output_size, name=None, stddev=0.02, bias_val=0.0):
                              initializer=tf.constant_initializer(bias_val))
         return tf.matmul(in_var, W) + b
 
-def residual_block(in_var, nb_blocks, out_channels, batch_norm=True, strides=[1,1,1,1],
+def residual_block(in_var, nb_blocks, out_channels, batch_norm=False, strides=[1,1,1,1],
                     downsample=False, downsample_strides=[1,2,2,1], name=None):
     assert name is not None, 'Op name should be specified'
     #
@@ -132,26 +132,29 @@ def residual_network(x):
         net = residual_block(net, resnet_units, 128, name='resblock_2')
         net = residual_block(net, 1, 256, downsample=True, name='resblock_2-5')
         net = residual_block(net, resnet_units, 256, name='resblock_3')
-        # net = residual_block(net, 1, 512, downsample=True, name='resblock_3-5')
-        # net = residual_block(net, resnet_units, 512, name='resblock_4')
+        net = residual_block(net, 1, 512, downsample=True, name='resblock_3-5')
+        net = residual_block(net, resnet_units, 512, name='resblock_4')
         # batch normalize
         net = tf.nn.relu(net)
         net = global_avg_pool(net)
         return net
 
 def compute_energy(o1, o2):
-    with tf.name_scope('energy')
-        _energy = tf.reduce_sum(tf.abs(tf.sub(o1, o2)), reduction_indices=1)
+    with tf.name_scope('energy'):
+        _energy = tf.reduce_sum(tf.pow(tf.sub(o1, o2), 2), reduction_indices=1)
         return _energy
 
 def compute_loss(y_, o1, o2, energy, margin=None):
     with tf.name_scope('loss'):
         labels_t = y_
-        labels_f = tf.sub(1.0, y_, name="1-yi")
+        labels_f = tf.sub(1.0, y_, name="1-y")
         M = tf.constant(margin, name="m")
-        # yi*||CNN(p1i)-CNN(p2i)||^2 + (1-yi)*max(0, C-||CNN(p1i)-CNN(p2i)||^2)
-        pos = tf.mul(labels_t, energy, name="yi_x_eucd2")
-        neg = tf.mul(labels_f, tf.pow(tf.maximum(tf.sub(M, energy), 0), 2), name="Nyi_x_C-eucd_xx_2")
+        # compute loss_g and loss_i
+        loss_g = tf.mul(0.5, tf.pow(energy, 2), name='l_G')
+        loss_i = tf.mul(0.5, tf.pow(tf.maximum(0.0, tf.sub(M, energy)), 2), name='l_I')
+        # compute full loss
+        pos = tf.mul(labels_f, loss_g, name='1-Yl_G')
+        neg = tf.mul(labels_t, loss_i, name='Yl_I')
         loss = tf.reduce_mean(tf.add(pos, neg), name='loss')
         return loss
 
@@ -166,24 +169,23 @@ with tf.variable_scope("siamese") as scope:
 
 # Calculate energy, loss, and accuracy
 margin = 4.0
-y_ = tf.placeholder(tf.float32, [None])
+y_ = tf.placeholder(tf.float32, [None, 1])
 energy = compute_energy(siamese1, siamese2)
 loss = compute_loss(y_, siamese1, siamese2, energy, margin)
 
 # prepare data and tf.session
 faces = ImageLoader()
-# sess = tf.Session()
-tf.InteractiveSession()
+sess = tf.Session()
 
 # setup siamese network
 train_step = tf.train.AdamOptimizer(1e-3).minimize(loss)
 sess.run(tf.initialize_all_variables())
 
-for step in range(60e4):
+for step in xrange(int(60e4)):
     batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(batch_size)
     batch_y = (batch_y1 == batch_y2).astype('float32')
 
-    _, loss_v = sess.run([train_step, loss], feed_dict={
+    _, energy, loss_v = sess.run([train_step, energy, loss], feed_dict={
                         x1: batch_x1, 
                         x2: batch_x2, 
                         y_: batch_y})
