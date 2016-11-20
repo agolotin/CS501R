@@ -8,8 +8,10 @@ import numpy as np
 
 import os
 
-batch_size = 10
-resnet_units = 5
+batch_size = 2
+resnet_units = 2
+
+tf.reset_default_graph()
 
 def global_avg_pool(in_var, name='global_pool'):
     assert name is not None, 'Op name should be specified'
@@ -155,8 +157,8 @@ def compute_loss(y_, o1, o2, energy, margin=None):
         # compute full loss
         pos = tf.mul(labels_f, loss_g, name='1-Yl_G')
         neg = tf.mul(labels_t, loss_i, name='Yl_I')
-        loss = tf.reduce_mean(tf.add(pos, neg), name='loss')
-        return loss
+        _loss = tf.reduce_mean(tf.add(pos, neg), name='loss')
+        return _loss
 
 # Create model
 x1 = tf.placeholder(tf.float32, [None, 250, 250])
@@ -170,25 +172,24 @@ with tf.variable_scope("siamese") as scope:
 # Calculate energy, loss, and accuracy
 margin = 4.0
 y_ = tf.placeholder(tf.float32, [None, 1])
-energy = compute_energy(siamese1, siamese2)
-loss = compute_loss(y_, siamese1, siamese2, energy, margin)
+energy_op = compute_energy(siamese1, siamese2)
+loss_op = compute_loss(y_, siamese1, siamese2, energy_op, margin)
+
+# setup siamese network
+train_step = tf.train.AdamOptimizer(1e-3).minimize(loss_op)
 
 # prepare data and tf.session
 faces = ImageLoader()
 sess = tf.Session()
 
-# setup siamese network
-train_step = tf.train.AdamOptimizer(1e-3).minimize(loss)
 sess.run(tf.initialize_all_variables())
 
 for step in xrange(int(60e4)):
     batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(batch_size)
-    batch_y = (batch_y1 == batch_y2).astype('float32')
+    batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
-    _, energy, loss_v = sess.run([train_step, energy, loss], feed_dict={
-                        x1: batch_x1, 
-                        x2: batch_x2, 
-                        y_: batch_y})
+    feed = {x1: batch_x1, x2: batch_x2, y_: batch_y}
+    _, energy, loss_v = sess.run([train_step, energy_op, loss_op], feed_dict=feed)
 
     if np.isnan(loss_v):
         print('Model diverged with loss = NaN')
