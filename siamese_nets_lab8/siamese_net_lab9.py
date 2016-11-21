@@ -11,7 +11,8 @@ import numpy as np
 import os
 import sys
 
-batch_size = 128
+batch_size = 10
+xsize, ysize = 50, 50
 resnet_units = 3
 
 tf.reset_default_graph()
@@ -62,7 +63,7 @@ def conv_2d(in_var, out_channels, filters=[3,3], strides=[1,1,1,1],
                              initializer=tf.truncated_normal_initializer(stddev=0.02))
         b = tf.get_variable(name + "_b", [out_channels], initializer=tf.constant_initializer(0.0))
 
-        conv = tf.nn.conv2d(in_var, W, strides=strides, padding=padding) + b
+        conv = tf.nn.conv2d(in_var, W, strides=strides, padding=padding)
         conv = tf.reshape(tf.nn.bias_add(conv, b), conv.get_shape())
 
         return conv
@@ -151,18 +152,18 @@ def batch_normalization(in_var, beta=0.0, gamma=1.0, epsilon=1e-5,
 
 def residual_network(x):
     with tf.name_scope('residual_network') as scope:
-        _x = tf.reshape(x, [batch_size, 250, 250, 1])
+        _x = tf.reshape(x, [batch_size, xsize, ysize, 1])
         net = conv_2d(_x, 8, filters=[7,7], strides=[1,2,2,1], name='conv_0')
         net = max_pool(net, name='max_pool_0')
         net = residual_block(net, resnet_units, 8, name='resblock_1')
         net = residual_block(net, 1, 16, downsample=True, name='resblock_1-5')
-        net = residual_block(net, resnet_units+1, 16, name='resblock_2')
+        net = residual_block(net, resnet_units, 16, name='resblock_2')
         net = residual_block(net, 1, 24, downsample=True, name='resblock_2-5')
-        net = residual_block(net, resnet_units+2, 24, name='resblock_3')
+        net = residual_block(net, resnet_units+1, 24, name='resblock_3')
         net = residual_block(net, 1, 32, downsample=True, name='resblock_3-5')
         net = residual_block(net, resnet_units, 32, name='resblock_4')
-        # net = batch_normalization(net, name='batch_norm')
-        # net = tf.nn.relu(net)
+        net = batch_normalization(net, name='batch_norm')
+        net = tf.nn.relu(net)
         net = global_avg_pool(net)
         return net
 
@@ -192,8 +193,8 @@ def compute_accuracy(true_y, pred_y):
 
 
 # Create model
-x1 = tf.placeholder(tf.float32, [None, 250, 250])
-x2 = tf.placeholder(tf.float32, [None, 250, 250])
+x1 = tf.placeholder(tf.float32, [None, xsize, ysize])
+x2 = tf.placeholder(tf.float32, [None, xsize, ysize])
 is_training = tf.placeholder(tf.bool)
 
 with tf.variable_scope("siamese") as scope:
@@ -209,7 +210,7 @@ loss_op = compute_loss(y_, energy_op)
 accuracy_op = compute_accuracy(y_, energy_op)
 
 # setup siamese network
-train_step = tf.train.AdamOptimizer(1e-3, beta1=0.5).minimize(loss_op)
+train_step = tf.train.AdamOptimizer(1e-4, beta1=0.5).minimize(loss_op)
 
 # prepare data and tf.session
 faces = ImageLoader()

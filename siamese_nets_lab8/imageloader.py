@@ -20,6 +20,8 @@ class ImageLoader(object):
         self._train_imgs = None
         self._test_imgs = None
 
+        self._xsize = 50
+
         if not os.path.exists(self.textfile):
             sys.exit('Cannot find list file')
         self.create_split()
@@ -52,8 +54,8 @@ class ImageLoader(object):
 
     def create_pairs(self, batch_size, train=True):
         assert batch_size % 2 == 0, 'Batch size should be an even number'
-        data_x1 = np.zeros((batch_size, 250, 250))
-        data_x2 = np.zeros((batch_size, 250, 250))
+        data_x1 = np.zeros((batch_size, self._xsize, self._xsize))
+        data_x2 = np.zeros((batch_size, self._xsize, self._xsize))
         labels_x1 = np.zeros((batch_size, 1))
         labels_x2 = np.zeros((batch_size, 1))
         # range of indices to pick from
@@ -71,12 +73,14 @@ class ImageLoader(object):
         allowed_range.remove(indx)
         # Pick 2 of the same or different faces
         _img1, _img2 = self._pick_same_faces(train) if same else self._pick_diff_faces(train)
-        data_x1[indx,:,:] = np.array(Image.open(_img1))
+        data_x1[indx,:,:] = np.array(self._load_img(_img1))
         labels_x1[indx] = self.subjects[_img1.split('/')[3]]
-        data_x2[indx,:,:] = np.array(Image.open(_img2))
+        data_x2[indx,:,:] = np.array(self._load_img(_img2))
         labels_x2[indx] = self.subjects[_img2.split('/')[3]]
         return data_x1, data_x2, labels_x1, labels_x2, allowed_range
 
+    def _load_img(self, img=None):
+        return Image.open(img).resize((self._xsize, self._xsize), Image.ANTIALIAS)
 
     def _pick_diff_faces(self, train):
         img1 = random.choice(self._train_imgs if train else self._test_imgs)
