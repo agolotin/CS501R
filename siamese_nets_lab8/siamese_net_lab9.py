@@ -187,7 +187,7 @@ def compute_loss(y_, energy):
 
 def compute_accuracy(true_y, pred_y):
     with tf.name_scope('accuracy'):
-        _pred_y = tf.cast(tf.less(pred_y, margin), tf.float32)
+        _pred_y = tf.cast(tf.less(pred_y, margin/2), tf.float32)
         _acc = tf.reduce_mean(tf.cast(tf.equal(true_y, _pred_y), tf.float32))
         return _acc
 
@@ -222,7 +222,7 @@ for step in xrange(int(60e4)):
     batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(batch_size)
     batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
-    feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: True, margin: 1.25}
+    feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: True, margin: 4}
     _, loss_v, acc_v = sess.run([train_step, loss_op, accuracy_op], feed_dict=feed)
 
     if np.isnan(loss_v):
@@ -234,7 +234,7 @@ for step in xrange(int(60e4)):
         batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(1000, train=False)
         batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
-        feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: False, margin: 1.25}
+        feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: False, margin: 4}
         t_acc = sess.run(accuracy_op, feed_dict=feed)
         print('train set accuracy: {0}'.format(t_acc))
 
