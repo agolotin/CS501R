@@ -223,22 +223,20 @@ for step in xrange(int(60e4)):
     batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
     feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: True, margin: 1.25}
-    _, loss_v, en, acc_v = sess.run([train_step, loss_op, energy_op, accuracy_op], feed_dict=feed)
+    _, loss_v, acc_v = sess.run([train_step, loss_op, accuracy_op], feed_dict=feed)
 
     if np.isnan(loss_v):
         print('Model diverged with loss = NaN')
         sys.exit()
     if step % 10 == 0:
         print('step {0}: loss {1} accuracy: {2}'.format(step, loss_v, acc_v))
-    '''
     if step % 1000 == 0:
         batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(1000, train=False)
         batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
-        feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: False, margin: 2.7}
+        feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: False, margin: 1.25}
         t_acc = sess.run(accuracy_op, feed_dict=feed)
         print('train set accuracy: {0}'.format(t_acc))
-    '''
 
     sys.stdout.flush()
 
