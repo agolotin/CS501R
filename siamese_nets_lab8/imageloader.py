@@ -58,23 +58,21 @@ class ImageLoader(object):
         data_x2 = np.zeros((batch_size, self._xsize, self._xsize))
         labels_x1 = np.zeros((batch_size, 1))
         labels_x2 = np.zeros((batch_size, 1))
-        # get only train or test images
-        images_dict = self._train_imgs if train else self._test_imgs
         # range of indices to pick from
         allowed_range = range(0, batch_size)
         for i in xrange(batch_size/2):
             data_x1, data_x2, labels_x1, labels_x2, allowed_range = self._pick_faces(data_x1, 
-                            data_x2, labels_x1, labels_x2, allowed_range, images_dict, same=True)
+                            data_x2, labels_x1, labels_x2, allowed_range, train, same=True)
             data_x1, data_x2, labels_x1, labels_x2, allowed_range = self._pick_faces(data_x1, 
-                            data_x2, labels_x1, labels_x2, allowed_range, images_dict, same=False)
+                            data_x2, labels_x1, labels_x2, allowed_range, train, same=False)
         return data_x1, data_x2, labels_x1, labels_x2
 
     def _pick_faces(self, data_x1, data_x2, labels_x1, 
-                   labels_x2, allowed_range, images, same=None):
+                   labels_x2, allowed_range, train, same=None):
         indx = random.choice(allowed_range)
         allowed_range.remove(indx)
         # Pick 2 of the same or different faces
-        _img1, _img2 = self._pick_same_faces(images) if same else self._pick_diff_faces(images)
+        _img1, _img2 = self._pick_same_faces(train) if same else self._pick_diff_faces(train)
         data_x1[indx,:,:] = np.array(self._load_img(_img1))
         labels_x1[indx] = self.subjects[_img1.split('/')[3]]
         data_x2[indx,:,:] = np.array(self._load_img(_img2))
@@ -84,22 +82,31 @@ class ImageLoader(object):
     def _load_img(self, img=None):
         return Image.open(img).resize((self._xsize, self._xsize), Image.ANTIALIAS)
 
-    def _pick_diff_faces(self, images):
-        img1 = random.choice(images)
+    def _pick_diff_faces(self, train):
+        img1 = random.choice(self._train_imgs if train else self._test_imgs)
         name = img1.split('/')[3]
-        rand_name = random.choice(images.keys())
-        while rand_name == name:
-            rand_name = random.choice(images.keys())
-        img2 = random.choice(images[rand_name])
+        img2 = None
+        while True:
+            # pick two images
+            rand_name = random.choice(self.images.keys())
+            while rand_name == name:
+                rand_name = random.choice(self.images.keys())
+            img2 = random.choice(self.images[rand_name])
+            # make sure they come from right sets
+            if img2 not in [self._train_imgs, self._test_imgs][not train]:
+                rand_name = random.choice(self.images.keys())
+                img2 = random.choice(self.images[rand_name])
+                continue
+            break
         return img1, img2
 
-    def _pick_same_faces(self, images):
-        img1 = random.choice(images)
+    def _pick_same_faces(self, train):
+        img1 = random.choice(self._train_imgs if train else self._test_imgs)
         name = img1.split('/')[3]
-        while len(images[name]) <= 1:
-            img1 = random.choice(images)
+        while len(self.images[name]) <= 1:
+            img1 = random.choice(self._train_imgs if train else self._test_imgs)
             name = img1.split('/')[3]
-        img2 = random.choice(images[name])
+        img2 = random.choice(self.images[name])
         return img1, img2
 
     def next_batch(self, batch_size, train=True):
@@ -108,4 +115,4 @@ class ImageLoader(object):
 
 if __name__ == '__main__':
     it = ImageLoader()
-    x1, x2, l1, l2 = it.next_batch(1000)
+    x1, x2, l1, l2 = it.next_batch(10)
