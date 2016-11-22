@@ -11,7 +11,7 @@ import numpy as np
 import os
 import sys
 
-batch_size = 10
+batch_size = 128
 xsize, ysize = 50, 50
 resnet_units = 3
 
@@ -222,7 +222,7 @@ for step in xrange(int(60e4)):
     batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(batch_size)
     batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
-    feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: True, margin: 4}
+    feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: True, margin: 2.25}
     _, loss_v, acc_v = sess.run([train_step, loss_op, accuracy_op], feed_dict=feed)
 
     if np.isnan(loss_v):
@@ -231,10 +231,10 @@ for step in xrange(int(60e4)):
     if step % 10 == 0:
         print('step {0}: loss {1} accuracy: {2}'.format(step, loss_v, acc_v))
     if step % 1000 == 0:
-        batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(1000, train=False)
+        batch_x1, batch_x2, batch_y1, batch_y2 = faces.next_batch(batch_size, train=False)
         batch_y = (batch_y1 == batch_y2).astype(np.float32)
 
-        feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: False, margin: 4}
+        feed = {x1: batch_x1, x2: batch_x2, y_: batch_y, is_training: False, margin: 2.25}
         t_acc = sess.run(accuracy_op, feed_dict=feed)
         print('train set accuracy: {0}'.format(t_acc))
 
