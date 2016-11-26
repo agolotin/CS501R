@@ -69,12 +69,11 @@ with tf.name_scope('style'):
         # get dimentions
         N = style_ops[i].get_shape()[1].value
         M = style_ops[i].get_shape()[1].value * style_ops[i].get_shape()[2].value
-        depth = style_ops.get_shape()[-1].value
         # compute gram matrices for style layers
-        _layer_acts = main_style_acts[i].reshape(-1, depth)
+        _layer_acts = main_style_acts[i].reshape(-1, N**2)
         main_style_grams = np.dot(_layer_acts.T, _layer_acts)
         # compute gram matrix for generated image for a layer
-        _gram_matrix = tf.reshape(style_ops[i], [-1, depth])
+        _gram_matrix = tf.reshape(style_ops[i], [-1, N**2])
         g_l = tf.matmul(tf.transpose(_gram_matrix), _gram_matrix)
         # compute style loss
         e_l = tf.nn.l2_loss(tf.sub(g_l, main_style_grams))
