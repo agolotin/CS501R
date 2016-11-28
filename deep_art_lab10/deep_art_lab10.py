@@ -112,15 +112,15 @@ sess.run(opt_img.assign(content_img))
 
 def _imsave(path, img):
     img = np.clip(img, 0.0, 255.0).astype(np.uint8)
-    #img = imresize(img, (1014, 1280)).astype(np.uint8)
+    img = imresize(img, (1014, 1280, 3)).astype(np.uint8)
     imsave(path, img)
 
 # optimization loop
-for step in xrange(int(10e3)):
+for step in xrange(int(10e4)):
     # take an optimizer step
     _, _loss, _cont, _style = sess.run([train_step, total_loss, content_loss, style_loss])
     # clip values
-    if step % 100 == 0:
+    if step % 1000 == 0:
         _img = sess.run(opt_img)
         _imsave('output/img_{}.png'.format(step), _img[0])
         _img = tf.clip_by_value(_img, 0.0, 255.0)
