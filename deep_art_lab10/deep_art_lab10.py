@@ -80,8 +80,8 @@ with tf.name_scope('style'):
         N = depth
         M = width * height
         # compute gram matrix for generated image for a layer
-        _gram_matrix = tf.reshape(style_ops[i], [-1, width*height])
-        g_l = tf.matmul(_gram_matrix, _gram_matrix, transpose_b=True)
+        _reshaped_layer = tf.reshape(style_ops[i], [-1, width*height])
+        g_l = tf.matmul(_reshaped_layer, _reshaped_layer, transpose_b=True)
         # compute style loss
         e_l = tf.nn.l2_loss(tf.sub(g_l, style_grams[i]))
         e_l = tf.div(e_l, 2.0*(N**2)*(M**2), name='e_l')
@@ -100,7 +100,7 @@ with tf.name_scope('loss'):
 
 # --- place your adam optimizer call here
 #     (don't forget to optimize only the opt_img variable)
-train_step = tf.train.AdamOptimizer(1e-1).minimize(total_loss)
+train_step = tf.train.AdamOptimizer(1e-1, beta1=0.5).minimize(total_loss, var_list=[opt_img])
 
 # this clobbers all VGG variables, but we need it to initialize the
 # adam stuff, so we reload all of the weights...
@@ -116,14 +116,14 @@ def _imsave(path, img):
     imsave(path, img)
 
 # optimization loop
-for step in xrange(int(10e2)):
+for step in xrange(int(10e3)):
     # take an optimizer step
     _, _loss, _cont, _style = sess.run([train_step, total_loss, content_loss, style_loss])
     # clip values
     if step % 100 == 0:
         _img = sess.run(opt_img)
-        _img = tf.clip_by_value(_img, 0.0, 255.0)
         _imsave('output/img_{}.png'.format(step), _img[0])
+        _img = tf.clip_by_value(_img, 0.0, 255.0)
         sess.run(opt_img.assign(_img))
 
     if step % 10 == 0:
