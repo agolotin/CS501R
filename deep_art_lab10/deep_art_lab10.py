@@ -8,9 +8,9 @@ import vgg16
 from scipy.misc import imread, imresize, imsave
 from pdb import set_trace as debugger
 
-content_wegiht = tf.constant(1e-4, dtype=tf.float32)
-style_weight = tf.constant(1e-1, dtype=tf.float32)
-content_layers = ['conv4_2']
+content_wegiht = tf.constant(1e-3, dtype=tf.float32)
+style_weight = tf.constant(1, dtype=tf.float32)
+content_layer = 'conv4_2'
 style_layers = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv5_1']
 
 sess = tf.Session()
@@ -40,54 +40,54 @@ layers = [ 'conv1_1', 'conv1_2',
            'conv5_1', 'conv5_2', 'conv5_3' ]
 
 ops = [getattr(vgg, x) for x in layers]
-
 content_acts = sess.run(ops, feed_dict={vgg.imgs: content_img})
 style_acts = sess.run(ops, feed_dict={vgg.imgs: style_img})
 
 #
 # --- construct cost function 
 #
-
-
 def total_loss_op(content_l, style_l):
-    return tf.add(tf.mul(content_wegiht, content_l), tf.mul(style_weight, style_l))
+    _content_loss = tf.mul(content_wegiht, content_l)
+    _style_loss = tf.mul(style_weight, style_l)
+    return tf.add(_content_loss, _style_loss)
 
+with tf.name_scope('precompute'):
+    style_grams = []
+    for i in [0, 2, 4, 7, 10]:
+        curr_style_acts = style_acts[i]
+        # compute gram matrices for style layers
+        depth = curr_style_acts.shape[-1]
+        _layer_acts = curr_style_acts.reshape(depth, -1)
+        _gram = np.dot(_layer_acts, _layer_acts.T)
+        style_grams.append(_gram)
 
 with tf.name_scope('content'):
+    assert isinstance(content_layer, str)
     # get content features op from vgg activations
-    content_ops = [getattr(vgg, x) for x in content_layers]
+    p_content_op = getattr(content_acts, content_layer)
+    g_content_op = getattr(vgg, content_layer)
     # loss op
-    content_loss = tf.nn.l2_loss(tf.sub(content_acts[8], content_ops))
+    content_loss = tf.nn.l2_loss(tf.sub(g_content_op, p_content_op))
 
 with tf.name_scope('style'):
-    main_style_acts = map(lambda idx: style_acts[idx], [0, 2, 4, 7, 10])
     # get style features op from vgg activations
     style_ops = [getattr(vgg, x) for x in style_layers]
-    w_l = tf.constant(1/5, dtype=tf.float32, name='factor')
-    style_loss = []
+    w_l = tf.constant(1/5.0, dtype=tf.float32, name='factor')
+    style_losses = []
     for i in xrange(len(style_ops)):
         # get dimentions
-        N = style_ops[i].get_shape()[1].value
-        M = style_ops[i].get_shape()[1].value * style_ops[i].get_shape()[2].value
-        # compute gram matrices for style layers
-        _layer_acts = main_style_acts[i].reshape(-1, N**2)
-        main_style_grams = np.dot(_layer_acts.T, _layer_acts)
+        _, width, height, depth = map(lambda x: x.value, style_ops[i].get_shape())
+        N = width
+        M = width * height
         # compute gram matrix for generated image for a layer
-        _gram_matrix = tf.reshape(style_ops[i], [-1, N**2])
-        g_l = tf.matmul(tf.transpose(_gram_matrix), _gram_matrix)
+        _gram_matrix = tf.reshape(style_ops[i], [-1, width*height])
+        g_l = tf.div(tf.matmul(_gram_matrix, _gram_matrix, transpose_b=True), width*height*depth)
         # compute style loss
-        e_l = tf.nn.l2_loss(tf.sub(g_l, main_style_grams))
-        e_l = tf.truediv(e_l, 2.0*(N**2)*(M**2), name='e_l') # 4N**2M**2
-        style_loss.append(tf.mul(w_l, e_l, name='we_l'))
+        e_l = tf.nn.l2_loss(tf.sub(g_l, style_grams[i]))
+        e_l = tf.div(e_l, 2.0*(N**2)*(M**2), name='e_l')
+        style_losses.append(tf.mul(w_l, e_l, name='we_l'))
     # sum all the style losses together
-    style_loss = reduce(tf.add, style_loss)
-    # compute gram matrices for generated image
-    #_gram_matrices = map(lambda layer: tf.reshape(layer, [-1, layer.get_shape()[-1].value]), style_ops)
-    #g_ls = map(lambda _gram: tf.matmul(tf.transpose(_gram), _gram), _gram_matrices)
-    # compute style losses
-    #e_ls = map(lambda idx: tf.nn.l2_loss(tf.sub(g_ls[idx], main_style_grams[idx]), name='e_L'), range(len(g_ls)))
-    #intermediate_style_losses = map(lambda e_l: tf.mul(w_l, e_l, name='we_l'), e_ls)
-    #style_loss = tf.truediv(reduce(tf.add, intermediate_style_losses), 2.0) # 4N**2M**2
+    style_loss = reduce(tf.add, style_losses)
 
 with tf.name_scope('loss'):
     total_loss = total_loss_op(content_loss, style_loss)
@@ -111,21 +111,23 @@ vgg.load_weights('vgg16_weights.npz', sess)
 sess.run(opt_img.assign(content_img))
 
 def _imsave(path, img):
-    img = img.astype(np.uint8)
+    img = img.reshape(-1, 448)
+    img = imresize(img, (1014, 1280)).astype(np.uint8)
     imsave(path, img)
 
-# --- optimization loop
+# optimization loop
 for step in xrange(int(10e2)):
     # take an optimizer step
-    _, _loss = sess.run([train_step, total_loss])
+    _, _loss, _cont, _style = sess.run([train_step, total_loss, content_loss, style_loss])
     # clip values
     if step % 100 == 0:
         _img = sess.run(opt_img)
         _img = np.clip(_img, 0.0, 255.0)
-        _imsave('output/img_{}'.format(step), _img)
+        _imsave('output/img_{}.png'.format(step), _img)
         sess.run(opt_img.assign(_img))
 
-    print('iteration {} loss {}'.format(step, _loss))
+    if step % 10 == 0:
+        print('iteration {} total loss {}; style loss {}; content loss {}'.format(step, _loss, _style, _cont))
 
 
 sess.close()
