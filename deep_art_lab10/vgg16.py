@@ -50,7 +50,7 @@ class vgg16:
             self.parameters += [kernel, biases]
 
         # pool1
-        self.pool1 = tf.nn.max_pool(self.conv1_2,
+        self.pool1 = tf.nn.avg_pool(self.conv1_2,
                                ksize=[1, 2, 2, 1],
                                strides=[1, 2, 2, 1],
                                padding='SAME',
@@ -79,7 +79,7 @@ class vgg16:
             self.parameters += [kernel, biases]
 
         # pool2
-        self.pool2 = tf.nn.max_pool(self.conv2_2,
+        self.pool2 = tf.nn.avg_pool(self.conv2_2,
                                ksize=[1, 2, 2, 1],
                                strides=[1, 2, 2, 1],
                                padding='SAME',
@@ -119,7 +119,7 @@ class vgg16:
             self.parameters += [kernel, biases]
 
         # pool3
-        self.pool3 = tf.nn.max_pool(self.conv3_3,
+        self.pool3 = tf.nn.avg_pool(self.conv3_3,
                                ksize=[1, 2, 2, 1],
                                strides=[1, 2, 2, 1],
                                padding='SAME',
@@ -159,7 +159,7 @@ class vgg16:
             self.parameters += [kernel, biases]
 
         # pool4
-        self.pool4 = tf.nn.max_pool(self.conv4_3,
+        self.pool4 = tf.nn.avg_pool(self.conv4_3,
                                ksize=[1, 2, 2, 1],
                                strides=[1, 2, 2, 1],
                                padding='SAME',
@@ -199,7 +199,7 @@ class vgg16:
             self.parameters += [kernel, biases]
 
         # pool5
-        self.pool5 = tf.nn.max_pool(self.conv5_3,
+        self.pool5 = tf.nn.avg_pool(self.conv5_3,
                                ksize=[1, 2, 2, 1],
                                strides=[1, 2, 2, 1],
                                padding='SAME',

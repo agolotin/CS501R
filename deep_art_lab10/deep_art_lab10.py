@@ -1,9 +1,12 @@
 from __future__ import print_function
 from __future__ import division
 
+assert len(sys.argv) == 2, 'Specify output image name'
+
 import numpy as np
 import tensorflow as tf
 import vgg16
+import sys
 
 from scipy.misc import imread, imresize, imsave
 from pdb import set_trace as debugger
@@ -83,7 +86,6 @@ with tf.name_scope('style'):
     style_loss = reduce(tf.add, style_losses)
 
 with tf.name_scope('loss'):
-    
     total_loss = tf.add(content_wegiht * content_loss, style_weight * style_loss)
 
 # Relevant snippets from the paper:
@@ -92,9 +94,7 @@ with tf.name_scope('loss'):
 #   The ratio alpha/beta was  1x10-3
 #   The factor w_l was always equal to one divided by the number of active layers (ie, 1/5)
 
-# --- place your adam optimizer call here
-#     (don't forget to optimize only the opt_img variable)
-train_step = tf.train.AdamOptimizer(1e-1, epsilon=0.1).minimize(total_loss, var_list=[opt_img])
+train_step = tf.contrib.opt.ScipyOptimizerInterface(total_loss, var_list=[opt_img], method='L-BFGS-B', options={'maxiter': 0})
 
 # this clobbers all VGG variables, but we need it to initialize the
 # adam stuff, so we reload all of the weights...
@@ -111,17 +111,18 @@ def _imsave(path, img):
 
 # optimization loop
 for step in xrange(int(10e4)):
+    # report loss
+    if step % 10 == 0:
+        _loss, _cont, _style = sess.run([total_loss, content_loss, style_loss])
+        print('iteration {} total loss {}; style loss {}; content loss {}'.format(step, _loss, _style, _cont))
     # take an optimizer step
-    _, _loss, _cont, _style = sess.run([train_step, total_loss, content_loss, style_loss])
+    train_step.minimize(sess)
     # clip values
-    if step % 1000 == 0:
+    if step % 100 == 0:
         _img = sess.run(opt_img)
-        _imsave('output/img_{}.png'.format(step), _img[0])
+        _imsave('output/{}_{}.png'.format(sys.argv[1], step), _img[0])
         _img = tf.clip_by_value(_img, 0.0, 255.0)
         sess.run(opt_img.assign(_img))
-
-    if step % 10 == 0:
-        print('iteration {} total loss {}; style loss {}; content loss {}'.format(step, _loss, _style, _cont))
 
 
 sess.close()
