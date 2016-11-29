@@ -1,12 +1,12 @@
 from __future__ import print_function
 from __future__ import division
 
-assert len(sys.argv) == 2, 'Specify output image name'
-
 import numpy as np
 import tensorflow as tf
 import vgg16
 import sys
+
+assert len(sys.argv) == 2, 'Specify output image name'
 
 from scipy.misc import imread, imresize, imsave
 from pdb import set_trace as debugger
