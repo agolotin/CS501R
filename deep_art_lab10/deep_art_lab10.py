@@ -9,7 +9,7 @@ from scipy.misc import imread, imresize, imsave
 from pdb import set_trace as debugger
 
 content_wegiht = tf.constant(1, dtype=tf.float32)
-style_weight = tf.constant(1e4, dtype=tf.float32)
+style_weight = tf.constant(10000, dtype=tf.float32)
 
 content_layer = 'conv4_2'
 style_layers = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv5_1']
@@ -19,9 +19,7 @@ summary_writer = tf.train.SummaryWriter("./tf_logs", graph=sess.graph)
 
 opt_img = tf.Variable(tf.truncated_normal([1,224,224,3], dtype=tf.float32, 
                                            stddev=1e-1), name='opt_img')
-
 tmp_img = tf.clip_by_value(opt_img, 0.0, 255.0)
-
 vgg = vgg16.vgg16(tmp_img, 'vgg16_weights.npz', sess)
 
 style_img = imread('style.png', mode='RGB')
@@ -45,11 +43,6 @@ style_acts = sess.run(ops, feed_dict={vgg.imgs: style_img})
 #
 # --- construct cost function 
 #
-def total_loss_op(content_l, style_l):
-    _content_loss = tf.mul(content_wegiht, content_l)
-    _style_loss = tf.mul(style_weight, style_l)
-    return tf.add(_content_loss, _style_loss)
-
 with tf.name_scope('content'):
     assert isinstance(content_layer, str)
     # get content features op from vgg activations
@@ -65,8 +58,8 @@ with tf.name_scope('precompute_style'):
         curr_style_acts = style_acts[i]
         # compute gram matrices for style layers
         depth = curr_style_acts.shape[-1]
-        _layer_acts = curr_style_acts.reshape(depth, -1)
-        _gram = np.dot(_layer_acts, _layer_acts.T)
+        _layer_acts = curr_style_acts.reshape(-1, depth)
+        _gram = np.dot(_layer_acts.T, _layer_acts)
         style_grams.append(_gram)
 
 with tf.name_scope('style'):
@@ -80,17 +73,18 @@ with tf.name_scope('style'):
         N = depth
         M = width * height
         # compute gram matrix for generated image for a layer
-        _reshaped_layer = tf.reshape(style_ops[i], [-1, width*height])
-        g_l = tf.matmul(_reshaped_layer, _reshaped_layer, transpose_b=True)
+        _reshaped_layer = tf.reshape(style_ops[i], [-1, depth])
+        g_l = tf.matmul(_reshaped_layer, _reshaped_layer, transpose_a=True)
         # compute style loss
         e_l = tf.nn.l2_loss(tf.sub(g_l, style_grams[i]))
-        e_l = tf.div(e_l, 2.0*(N**2)*(M**2), name='e_l')
+        e_l = tf.truediv(e_l, 2.0*(N**2)*(M**2), name='e_l')
         style_losses.append(tf.mul(w_l, e_l, name='we_l'))
     # sum all the style losses together
     style_loss = reduce(tf.add, style_losses)
 
 with tf.name_scope('loss'):
-    total_loss = total_loss_op(content_loss, style_loss)
+    
+    total_loss = tf.add(content_wegiht * content_loss, style_weight * style_loss)
 
 # Relevant snippets from the paper:
 #   For the images shown in Fig 2 we matched the content representation on layer 'conv4_2'
@@ -100,7 +94,7 @@ with tf.name_scope('loss'):
 
 # --- place your adam optimizer call here
 #     (don't forget to optimize only the opt_img variable)
-train_step = tf.train.AdamOptimizer(1e-1, beta1=0.5).minimize(total_loss, var_list=[opt_img])
+train_step = tf.train.AdamOptimizer(1e-1, epsilon=0.1).minimize(total_loss, var_list=[opt_img])
 
 # this clobbers all VGG variables, but we need it to initialize the
 # adam stuff, so we reload all of the weights...
@@ -112,7 +106,7 @@ sess.run(opt_img.assign(content_img))
 
 def _imsave(path, img):
     img = np.clip(img, 0.0, 255.0).astype(np.uint8)
-    img = imresize(img, (1014, 1280, 3)).astype(np.uint8)
+    #img = imresize(img, (1014, 1280, 3)).astype(np.uint8)
     imsave(path, img)
 
 # optimization loop
