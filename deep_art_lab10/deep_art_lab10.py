@@ -20,7 +20,7 @@ style_layers = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv5_1']
 #######################
 
 def initialize_vgg(sess):
-    opt_img = tf.Variable(tf.truncated_normal([1,224,224,3], dtype=tf.float32, 
+    opt_img = tf.Variable(tf.truncated_normal([1,448,448,3], dtype=tf.float32, 
                                                stddev=1e-1), name='opt_img')
     tmp_img = tf.clip_by_value(opt_img, 0.0, 255.0)
     vgg = vgg16.vgg16(tmp_img, 'vgg16_weights.npz', sess)
@@ -32,12 +32,12 @@ def initialize_style_and_content(sess, vgg, content='content.png', style='style.
     global layers
     # load the style image
     style_img = imread(style, mode='RGB')
-    style_img = imresize(style_img, (224, 224))
-    style_img = np.reshape(style_img, [1,224,224,3])
+    style_img = imresize(style_img, (448, 448))
+    style_img = np.reshape(style_img, [1,448,448,3])
     # load the content image
     content_img = imread(content, mode='RGB')
-    content_img = imresize(content_img, (224, 224))
-    content_img = np.reshape(content_img, [1,224,224,3])
+    content_img = imresize(content_img, (448, 448))
+    content_img = np.reshape(content_img, [1,448,448,3])
     # get content and style activations
     ops = [getattr(vgg, x) for x in layers]
     _content_acts = sess.run(ops, feed_dict={vgg.imgs: content_img})
@@ -71,7 +71,7 @@ def style_loss_op(vgg, style_grams):
             N = depth
             M = width * height
             # compute gram matrix for generated image for a layer
-            _reshaped_layer = tf.reshape(style_ops[i], [-1, depth])
+            _reshaped_layer = tf.reshape(style_ops[i], [-1, N])
             g_l = tf.matmul(_reshaped_layer, _reshaped_layer, transpose_a=True)
             # compute style loss
             e_l = tf.nn.l2_loss(tf.sub(g_l, style_grams[i]))
